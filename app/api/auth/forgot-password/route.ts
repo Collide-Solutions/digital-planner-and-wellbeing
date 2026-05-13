@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendResetEmail } from '@/services/email';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   const { email } = await request.json();
   if (!email) {
