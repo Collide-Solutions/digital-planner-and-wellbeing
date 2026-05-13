@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskStatus {
+  LOCKED
+  PENDING
+  ACTIVE
+  WAITING_APPROVAL
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id          String         @id @default(uuid())
+  name        String?
+  email       String         @unique
+  password    String
+  role        Role           @default(EMPLOYEE)
+  department  String?
+  shiftStart  String?
+  shiftEnd    String?
+  avatar      String?
+  createdAt   DateTime       @default(now())
+  tasks       Task[]         @relation("AssignedTasks")
+  assigned    Task[]         @relation("AssignedBy")
+  announcements Announcement[] @relation("AnnouncementCreator")
+  leaveRequests LeaveRequest[]
+  dailyReports DailyReport[]
+  notifications Notification[]
+  taskActivityLogs TaskActivityLog[]
+  requestComments RequestComment[]
+  sentRequests TaskRequest[] @relation("TaskRequestSender")
+  receivedRequests TaskRequest[] @relation("TaskRequestReceiver")
+}
+
+model Task {
+  id             String       @id @default(uuid())
+  title          String
+  description    String
+  priority       TaskPriority @default(MEDIUM)
+  status         TaskStatus   @default(LOCKED)
+  requiresProof  Boolean      @default(false)
+  currentHour    Int          @default(0)
+  estimatedHours Float        @default(1)
+  deadline       DateTime?
+  proofUrl       String?
+  adminApproved  Boolean      @default(false)
+  assignedById   String?
+  assignedToId   String?
+  
+  // Checklist fields
+  checklistReviewed        Boolean @default(false)
+  checklistRequirementsRecieved Boolean @default(false)
+  checklistStarted         Boolean @default(false)
+  checklistCompleted       Boolean @default(false)
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  activityLogs   TaskActivityLog[]
+  assignedBy     User?        @relation("AssignedBy", fields: [assignedById], references: [id])
+  assignedTo     User?        @relation("AssignedTasks", fields: [assignedToId], references: [id])
+}
+
+model TaskRequest {
+  id          String        @id @default(uuid())
+  senderId    String
+  receiverId  String
+  title       String
+  description String
+  priority    TaskPriority  @default(MEDIUM)
+  status      RequestStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+  comments    RequestComment[]
+  sender      User          @relation("TaskRequestSender", fields: [senderId], references: [id])
+  receiver    User          @relation("TaskRequestReceiver", fields: [receiverId], references: [id])
+}
+
+model TaskActivityLog {
+  id            String   @id @default(uuid())
+  taskId        String
+  changedById   String
+  fieldChanged  String
+  oldValue      String?
+  newValue      String?
+  createdAt     DateTime @default(now())
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  changedBy     User     @relation(fields: [changedById], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([changedById])
+}
+
+model RequestComment {
+  id        String      @id @default(uuid())
+  requestId String
+  userId    String
+  comment   String
+  createdAt DateTime    @default(now())
+  request   TaskRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([userId])
+}
+
+model Announcement {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  createdBy String
+  createdAt DateTime @default(now())
+  creator   User     @relation("AnnouncementCreator", fields: [createdBy], references: [id])
+}
+
+model LeaveRequest {
+  id        String      @id @default(uuid())
+  userId    String
+  reason    String
+  startDate DateTime
+  endDate   DateTime
+  status    LeaveStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  user      User        @relation(fields: [userId], references: [id])
+}
+
+model DailyReport {
+  id             String   @id @default(uuid())
+  userId         String
+  date           DateTime
+  completedTasks Int      @default(0)
+  pendingTasks   Int      @default(0)
+  summary        String?
+  user           User     @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      String?
+  entityId  String?
+  entityType String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
